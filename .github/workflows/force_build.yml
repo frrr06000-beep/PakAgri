@@ -1,0 +1,21 @@
+name: PakAgri Final Success
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: |
+          mkdir -p lib
+          cp main.dart lib/main.dart
+          # No flutter create here - we are using YOUR files now
+      - run: flutter pub get
+      - run: flutter build apk --release --no-tree-shake-icons
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PakAgri-Official-App
+          path: build/app/outputs/flutter-apk/app-release.apk
