@@ -1,0 +1,33 @@
+name: PakAgri Force Build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: |
+          # 1. Create project
+          flutter create --org com.pakagri.ai --project-name pak_agri_app .
+          
+          # 2. FORCE add the missing tools (This fixes your error)
+          flutter pub add camera tflite_flutter
+          
+          # 3. Move your code
+          mkdir -p lib
+          cp main.dart lib/main.dart
+          
+          # 4. Add the Brain files to the settings
+          echo "  assets:" >> pubspec.yaml
+          echo "    - PakAgriBrain.tflite" >> pubspec.yaml
+          echo "    - labels.txt" >> pubspec.yaml
+          
+      - run: flutter pub get
+      - run: flutter build apk --release --no-tree-shake-icons
+      - name: Upload Final APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PakAgri-Vision-App
+          path: build/app/outputs/flutter-apk/app-release.apk
