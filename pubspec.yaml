@@ -1,0 +1,16 @@
+name: pak_agri_app
+description: Pak Agri AI Official
+publish_to: 'none'
+version: 1.0.0+1
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.11.0
+  tflite_flutter: ^0.12.1
+flutter:
+  uses-material-design: true
+  assets:
+    - PakAgriBrain.tflite
+    - labels.txt
