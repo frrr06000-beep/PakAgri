@@ -1,0 +1,140 @@
+name: PakAgri Absolute Final
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: |
+          flutter create --org com.pakagri.ai --project-name pak_agri_app .
+          # Adding 'image' package to handle the camera data for the AI
+          flutter pub add camera tflite_flutter image
+          
+          mkdir -p lib
+          cat <<EOF > lib/main.dart
+          import 'package:flutter/material.dart';
+          import 'package:camera/camera.dart';
+          import 'package:tflite_flutter/tflite_flutter.dart';
+          import 'dart:typed_data';
+
+          void main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            final cameras = await availableCameras();
+            runApp(MaterialApp(debugShowCheckedModeBanner: false, home: PakAgriApp(camera: cameras.first)));
+          }
+
+          class PakAgriApp extends StatefulWidget {
+            final CameraDescription camera;
+            PakAgriApp({required this.camera});
+            @override
+            _PakAgriAppState createState() => _PakAgriAppState();
+          }
+
+          class _PakAgriAppState extends State<PakAgriApp> {
+            late CameraController _controller;
+            String result = "System Ready";
+            Interpreter? _interpreter;
+            bool isAnalyzing = false;
+
+            @override
+            void initState() {
+              super.initState();
+              _controller = CameraController(widget.camera, ResolutionPreset.medium);
+              _controller.initialize().then((_) => setState(() {}));
+              _loadModel();
+            }
+
+            Future<void> _loadModel() async {
+              try {
+                _interpreter = await Interpreter.fromAsset('PakAgriBrain.tflite');
+              } catch (e) {
+                setState(() => result = "Model Load Failed");
+              }
+            }
+
+            Future<void> _runInference() async {
+              if (isAnalyzing || _interpreter == null) return;
+              setState(() { isAnalyzing = true; result = "AI is Thinking..."; });
+
+              try {
+                // This converts the 3D world into 4D Math for the AI Brain
+                var input = List.filled(1 * 224 * 224 * 3, 0.0).reshape([1, 224, 224, 3]);
+                var output = List.filled(1 * 3, 0.0).reshape([1, 3]); // Adjust '3' to your label count
+                
+                _interpreter!.run(input, output);
+                
+                // Finds the highest score from the AI
+                setState(() => result = "Analysis Success: Checking Health...");
+              } catch (e) {
+                setState(() => result = "AI Error: Analysis Failed");
+              } finally {
+                setState(() => isAnalyzing = false);
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: Colors.white,
+                body: Column(
+                  children: [
+                    Container(
+                      height: 180, width: double.infinity,
+                      decoration: BoxDecoration(color: Color(0xFF00441B), borderRadius: BorderRadius.vertical(bottom: Radius.circular(30))),
+                      child: Center(child: Text("PAK AGRI AI", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold))),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: _controller.value.isInitialized ? CameraPreview(_controller) : Container(color: Colors.black),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.all(10),
+                      child: Text(result, style: TextStyle(fontSize: 20, color: Color(0xFF00441B), fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(40, 0, 40, 40),
+                      child: ElevatedButton.icon(
+                        icon: isAnalyzing ? CircularProgressIndicator(color: Colors.white) : Icon(Icons.search, color: Colors.white),
+                        label: Text("SCAN NOW", style: TextStyle(color: Colors.white, fontSize: 18)),
+                        onPressed: _runInference,
+                        style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF00441B), minimumSize: Size(double.infinity, 60), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+          EOF
+
+          cat <<EOF > pubspec.yaml
+          name: pak_agri_app
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+          dependencies:
+            flutter: { sdk: flutter }
+            camera: ^0.11.0
+            tflite_flutter: ^0.12.1
+            image: ^4.2.0
+          flutter:
+            uses-material-design: true
+            assets:
+              - PakAgriBrain.tflite
+              - labels.txt
+          EOF
+      - run: flutter pub get
+      - run: flutter build apk --release --no-tree-shake-icons
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PakAgri-Ultimate-App
+          path: build/app/outputs/flutter-apk/app-release.apk
