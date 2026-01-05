@@ -1,0 +1,46 @@
+name: PakAgri Clean Build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: |
+          # 1. Create a fresh project structure
+          flutter create --org com.pakagri.ai --project-name pak_agri_app .
+          
+          # 2. Setup the official eyes and brain tools
+          flutter pub add camera tflite_flutter
+          
+          # 3. Put your Green/White design code in place
+          mkdir -p lib
+          cp main.dart lib/main.dart
+          
+          # 4. Create a PERFECT configuration file (No duplicates)
+          cat <<EOF > pubspec.yaml
+          name: pak_agri_app
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            camera: ^0.11.0
+            tflite_flutter: ^0.12.1
+          flutter:
+            uses-material-design: true
+            assets:
+              - PakAgriBrain.tflite
+              - labels.txt
+          EOF
+          
+      - run: flutter pub get
+      - run: flutter build apk --release --no-tree-shake-icons
+      - name: Upload Final APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PakAgri-Official-App
+          path: build/app/outputs/flutter-apk/app-release.apk
